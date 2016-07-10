@@ -2,7 +2,12 @@ from forecast import Forecast
 
 weather = Forecast()
 
-weather.load_tmy('../data/golden.csv')
-weather.auto_regressive(4, '1/1/1900 04:00')
+# weather.clean_tmy('../data/golden.csv')
+weather.load_tmy('../data/golden_clean.csv')
+
+weather.add_predictor('Dry-bulb (C)').add_predictor('Dew-point (C)')
+
+predictions = weather.auto_regressive(4, 10)
+print(predictions)
 
 weather.persist()
