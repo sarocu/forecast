@@ -1,6 +1,8 @@
-from forecast import forecast
+from forecast import Forecast
 
-weather = forecast()
+weather = Forecast()
 
-weather.loadTMY('../data/golden.csv')
+weather.load_tmy('../data/golden.csv')
+weather.auto_regressive(4, '1/1/1900 04:00')
+
 weather.persist()
