@@ -1,6 +1,6 @@
 import json
 import pickle
-import numpy
+import numpy as np
 from datetime import datetime, timedelta
 import re
 import csv
@@ -9,7 +9,7 @@ import statsmodels.api as sm
 from sklearn import linear_model
 from sklearn.preprocessing import normalize
 import pandas
-from scipy import stats
+from scipy.stats import norm
 
 
 class Forecast:
@@ -103,35 +103,47 @@ class Forecast:
             self.predictor_variables.append(predictor)
         return self
 
-    def auto_regressive(self, lag, scenarios):
+
+    def auto_regressive(self, lag, scenarios, trim_data=True):
         """
         Fit a vector AR model to the data according to the given lag and compute a number of samples
         :param lag: Determines AR order of the model
         :param scenarios: Number of possible weather scenarios to return
         :return:
         """
-        end_horizon = datetime.strptime(self.simulation_time, '%m/%d/%Y %H:%M')
-        start_horizon = end_horizon - timedelta(hours=self.horizon)
-        data = self.dataBox.ix[start_horizon.strftime('%m/%d/%Y %H:%M').replace(' 0', ' ').lstrip('0').replace('/0', '/'): end_horizon.strftime('%m/%d/%Y %H:%M').replace(' 0', ' ').lstrip('0').replace('/0', '/')]
+        end_horizon = datetime.strptime(self.simulation_time, '%m/%d/%Y %H:%M') + timedelta(hours=self.horizon)
+        start_horizon = end_horizon - timedelta(hours=2*self.horizon)
+
+        if trim_data:
+            data = self.dataBox.ix[start_horizon.strftime('%m/%d/%Y %H:%M').replace(' 0', ' ').lstrip('0').replace('/0', '/'): end_horizon.strftime('%m/%d/%Y %H:%M').replace(' 0', ' ').lstrip('0').replace('/0', '/')]
+        else:
+            data = self.dataBox
+
         data.index = pandas.to_datetime(data.index, format='%m/%d/%Y %H:%M')
         for field in data:
             if field not in self.predictor_variables:
                 data = data.drop(field, axis=1)
 
         model = sm.tsa.VAR(data)
+        print(len(data))
         fit = model.fit(maxlags=lag, ic='aic')
         predictions = {}
 
+        std = data.std()
+
         for i in range(0, scenarios):
+            # First, mutate the data with a random number within +-1 standard deviation:
+            copy = data
+            for field in copy:
+                copy[field] = copy[field].apply(lambda x: np.random.normal(loc=x, scale=std[field]))
             predictions[i] = fit.forecast(data.values[-lag:], self.horizon)
         return predictions
-
 
 
     def fit_glm(self):
         """Fits a Bayes Ridge Regression model to the data
 
-        Before this method will work, at least one response and one predictor must be set 
+        Before this method will work, at least one response and one predictor must be set
         """
         if not self.dataBox:
             return None
